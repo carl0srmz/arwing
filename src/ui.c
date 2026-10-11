@@ -33,6 +33,7 @@ static const char *masks[] = { "Grille", "Shadow", "Slot" };
 static const char *aspects[] = { "8:7", "4:3", "16:9 fill", "16:9 stretch" };
 static const char *onoff[] = { "Off", "On" };
 static const char *hd3d[] = { "", "Off", "2x", "3x", "4x" };
+static const char *superfx[] = { "Normal", "Fast" };
 static const char *audios[] = { "Accurate", "Hi-res" };
 
 static Item items[32]; static int nitems;
@@ -48,6 +49,7 @@ static void build_items(bool in_game) {
   ADD("Aspect", IT_CHOICE, &cfg.aspect, 0, ASPECT_COUNT - 1, 1, aspects, "4:3 is how it looked on a TV. 16:9 fill blurs the picture into the sides.", 1, 0);
   ADD("Integer scale", IT_CHOICE, &cfg.integer_scale, 0, 1, 1, onoff, "Even pixels. Might leave borders.", 0, 0);
   ADD("HD 3D", IT_CHOICE, &cfg.hd3d, 1, 4, 1, hd3d, "Draws the polygons at higher res. Sprites stay as they are.", 1, 0);
+  ADD("SuperFX", IT_CHOICE, &cfg.superfx, 0, 1, 1, superfx, "Fast gets rid of slowdown in busy scenes, so they play at full speed.", 1, 0);
   ADD("Sound", IT_CHOICE, &cfg.audio_hires, 0, 1, 1, audios, "Hi-res skips the SNES's muffled filter. Enter plays a sample.", -2, A_SAMPLE);
   ADD("Volume", IT_SLIDER, &cfg.volume, 0, 100, 10, NULL, "Volume.", -2, 0);
   ADD("Fullscreen", IT_CHOICE, &cfg.fullscreen, 0, 1, 1, onoff, "F11 works too.", -1, 0);

@@ -119,6 +119,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--wramdump") && i + 1 < argc) wramdump_frame = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--hashlog") && i + 1 < argc) hashlog = fopen(argv[++i], "w");
     else if (!strcmp(argv[i], "--state") && i + 1 < argc) state_file = argv[++i];
+    else if (!strcmp(argv[i], "--gsuoc") && i + 1 < argc) { extern u32 gsu_mul; gsu_mul = 256 / atoi(argv[++i]); }
     else if (!strcmp(argv[i], "--savestate") && i + 2 < argc) { save_frame = atoi(argv[++i]); save_file = argv[++i]; }
     else rom_path = argv[i];
   }

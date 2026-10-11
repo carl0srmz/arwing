@@ -12,7 +12,7 @@ extern const char *bind_names[BIND_COUNT];
 
 typedef struct {
   int filter, crt_mask, crt_curvature, crt_scanlines, crt_glow;
-  int aspect, integer_scale, hd3d, fullscreen, vsync, show_fps;
+  int aspect, integer_scale, hd3d, fullscreen, vsync, show_fps, superfx;
   int audio_hires, volume, ff_speed;
   int key[BIND_COUNT];
   int pad[BIND_COUNT];

@@ -275,6 +275,7 @@ int app_run(void) {
           in_game = true;
         }
         hd_scale = cfg.hd3d >= 2 ? cfg.hd3d : 0; hd_reset();
+        { extern u32 gsu_mul; gsu_mul = cfg.superfx ? 85 : 256; }
         cfg_save("starfox.ini");
         audio_stop_clip();
         mode = M_GAME; paused = false; input_flush_edges();

@@ -14,7 +14,7 @@ typedef struct {
   bool r15mod;
   u8 cache[512]; bool cvalid[32];
   struct { u8 data[8]; u8 bitpend; u16 offset; } pc[2];
-  u64 clock;
+  u64 clock; u32 cfrac;
   bool cache_written;
 } Gsu;
 extern Gsu g;
@@ -28,7 +28,8 @@ void gsu_plot(u8 x, u8 y);
 u8 gsu_rpix(u8 x, u8 y);
 u8 gsu_read_opcode(u16 addr);
 
-static inline void gstep(int n) { g.clock += n; }
+extern u32 gsu_mul;
+static inline void gstep(int n) { u32 t = g.cfrac + n * gsu_mul; g.clock += t >> 8; g.cfrac = t & 255; }
 static inline int memcyc(void) { return g.clsr ? 5 : 6; }
 
 static inline u8 gread(u32 a) {

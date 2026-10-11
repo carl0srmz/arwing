@@ -26,7 +26,7 @@ void cfg_defaults(Settings *s) {
 }
 
 #define FIELDS(X) X(filter) X(crt_mask) X(crt_curvature) X(crt_scanlines) X(crt_glow) X(aspect) X(integer_scale) \
-  X(hd3d) X(fullscreen) X(vsync) X(show_fps) X(audio_hires) X(volume) X(ff_speed)
+  X(hd3d) X(fullscreen) X(vsync) X(show_fps) X(audio_hires) X(volume) X(ff_speed) X(superfx)
 
 void cfg_load(const char *path) {
   cfg_defaults(&cfg);
@@ -49,6 +49,7 @@ void cfg_load(const char *path) {
   if (cfg.filter < 0 || cfg.filter >= FILT_COUNT) cfg.filter = FILT_SMOOTH;
   if (cfg.aspect < 0 || cfg.aspect >= ASPECT_COUNT) cfg.aspect = ASPECT_4_3;
   if (cfg.hd3d < 1 || cfg.hd3d > 4) cfg.hd3d = 1;
+  if (cfg.superfx < 0 || cfg.superfx > 1) cfg.superfx = 0;
 }
 
 void cfg_save(const char *path) {
