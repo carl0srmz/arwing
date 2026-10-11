@@ -1,0 +1,12 @@
+*.sfc
+*.smc
+*.srm
+data/
+build/
+out/
+__pycache__/
+*.obj
+starfox.ini
+saves/
+screenshots/
+preview_cache.bin
