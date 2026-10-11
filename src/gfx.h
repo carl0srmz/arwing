@@ -12,18 +12,20 @@
 
 typedef struct { int x, y, w, h; } Rect;
 
-#define C_SPACE RGB(0, 8, 32)
-#define C_PANEL RGB(32, 40, 104)
-#define C_EDGE RGB(136, 160, 232)
-#define C_INSET RGB(8, 12, 48)
-#define C_ROW RGB(56, 72, 160)
-#define C_TAB RGB(168, 200, 248)
-#define C_TEXT RGB(248, 248, 248)
-#define C_DIM RGB(104, 120, 184)
-#define C_SEL RGB(248, 200, 56)
-#define C_LCD RGB(64, 224, 64)
-#define C_COMM RGB(32, 40, 80)
-#define C_LOGO_EDGE RGB(80, 40, 144)
+#define C_SPACE RGB(41, 57, 74)
+#define C_PANEL RGB(30, 43, 57)
+#define C_EDGE RGB(165, 181, 198)
+#define C_INSET RGB(123, 123, 132)
+#define C_ROW RGB(58, 82, 102)
+#define C_TAB RGB(189, 189, 198)
+#define C_TEXT RGB(255, 255, 255)
+#define C_DIM RGB(140, 160, 180)
+#define C_SEL RGB(156, 255, 255)
+#define C_LCD RGB(255, 255, 255)
+#define C_COMM RGB(0, 0, 0)
+#define C_LOGO_EDGE RGB(107, 49, 66)
+#define C_SHADE RGB(90, 90, 99)
+#define C_ARROW RGB(255, 181, 0)
 
 extern uint32_t *canvas; extern int cw, ch;
 extern HFONT f_title, f_item, f_small, f_tab;
@@ -38,6 +40,8 @@ void tab(int x, int y, const char *s);
 void sparkle(int cx, int cy);
 void stars(void);
 void logo(int x, int y);
+void plate(int x, int y, int w, int h);
+void lime(int x, int y, int w, int h);
 
 #ifdef _WIN32
 extern HDC mdc;

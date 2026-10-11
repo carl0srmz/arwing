@@ -42,31 +42,43 @@ void text_r(int xr, int y, HFONT f, COLORREF c, const char *s) { text(xr - text_
 
 void panel(int x, int y, int w, int h, COLORREF bg, COLORREF edge) {
   fill(x + 1, y, w - 2, h, edge); fill(x, y + 1, w, h - 2, edge);
-  fill(x + 1, y + 1, w - 2, h - 2, bg);
+  fill(x + 2, y + 2, w - 4, h - 4, RGB(16, 24, 31));
+  fill(x + 3, y + 3, w - 6, h - 6, bg);
+}
+void plate(int x, int y, int w, int h) {
+  fill(x, y, w, h, C_SHADE);
+  fill(x, y, w - 1, h - 1, C_TAB);
+  fill(x + 1, y + 1, w - 2, h - 2, C_INSET);
+}
+void lime(int x, int y, int w, int h) {
+  static const COLORREF c[4] = { RGB(49, 123, 0), RGB(148, 222, 0), RGB(115, 189, 0), RGB(82, 156, 0) };
+  for (int i = 0; i < 4; i++) fill(x + i, y + i, w - 2 * i, h - 2 * i, c[i]);
+  fill(x + 4, y + 4, w - 8, h - 8, C_COMM);
 }
 void tab(int x, int y, const char *s) {
   int w = text_w(f_tab, s) + 8;
-  panel(x, y, w, 11, C_TAB, C_TAB);
-  text(x + 4, y, f_tab, C_INSET, s);
+  plate(x, y, w, 11);
+  text(x + 4, y, f_tab, C_TEXT, s);
 }
 void sparkle(int cx, int cy) {
-  fill(cx - 4, cy, 9, 1, RGB(88, 136, 248)); fill(cx, cy - 4, 1, 9, RGB(88, 136, 248));
-  fill(cx - 1, cy - 1, 3, 3, RGB(168, 208, 255)); fill(cx, cy, 1, 1, C_TEXT);
-  if (GetTickCount() / 300 % 2) { fill(cx - 2, cy - 2, 1, 1, RGB(88, 136, 248)); fill(cx + 2, cy + 2, 1, 1, RGB(88, 136, 248));
-                                  fill(cx + 2, cy - 2, 1, 1, RGB(88, 136, 248)); fill(cx - 2, cy + 2, 1, 1, RGB(88, 136, 248)); }
+  for (int k = 0; k < 3; k++) { fill(cx - k, cy - 4 + k, 2 * k + 1, 1, C_ARROW); fill(cx - k, cy + 4 - k, 2 * k + 1, 1, C_ARROW); }
 }
 void stars(void) {
-  for (uint32_t i = 0, r = 12345; i < (uint32_t)(cw * ch / 300); i++) {
-    r = r * 1103515245 + 12345; int x = (r >> 8) % cw; r = r * 1103515245 + 12345; int y = (r >> 8) % ch;
-    int t = (r >> 4) & 7;
-    fill(x, y, 1, 1, t == 0 ? RGB(248, 120, 88) : t < 3 ? RGB(136, 168, 248) : t < 5 ? RGB(64, 80, 160) : RGB(200, 208, 240));
-  }
+  for (int y = 47; y < ch; y += 48) { fill(0, y, cw, 1, RGB(33, 47, 61)); fill(0, y + 1, cw, 1, RGB(52, 70, 89)); }
 }
 void logo(int x, int y) {
   static const int o[8][2] = { {-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,1},{-1,1},{1,-1} };
+  text(x + 3, y + 3, f_title, RGB(90, 90, 90), "STAR FOX");
   for (int i = 0; i < 8; i++) text(x + o[i][0], y + o[i][1], f_title, C_LOGO_EDGE, "STAR FOX");
-  text(x + 2, y + 2, f_title, C_LOGO_EDGE, "STAR FOX");
-  text(x, y, f_title, RGB(248, 216, 64), "STAR FOX");
+  text(x, y, f_title, RGB(222, 181, 115), "STAR FOX");
+#ifdef _WIN32
+  GdiFlush();
+#endif
+  uint32_t top = 222 << 16 | 181 << 8 | 115, bands[3] = { 222 << 16 | 165 << 8 | 99, 222 << 16 | 156 << 8 | 90, 222 << 16 | 148 << 8 | 82 };
+  int w = text_w(f_title, "STAR FOX") + 2;
+  for (int yy = y + 10; yy < y + 30 && yy < ch; yy++)
+    for (int xx = x; xx < x + w && xx < cw; xx++)
+      if (yy >= 0 && xx >= 0 && (canvas[yy * cw + xx] & 0xffffff) == top) canvas[yy * cw + xx] = (canvas[yy * cw + xx] & 0xff000000) | bands[yy < y + 15 ? 0 : yy < y + 20 ? 1 : 2];
 }
 
 void gfx_begin(void) { focus = 0; nwid_prev = 0; }
@@ -142,7 +154,8 @@ static bool widget(int x, int y, int w, int h, bool *f) {
 
 bool gfx_button(int x, int y, int w, const char *label) {
   bool f, hit = widget(x, y, w, 15, &f);
-  panel(x, y, w, 15, f ? C_ROW : C_INSET, f ? C_SEL : C_EDGE);
+  plate(x, y, w, 15);
+  if (f) { fill(x + 1, y + 1, w - 2, 13, C_ROW); sparkle(x + 6, y + 7); }
   text(x + (w - text_w(f_item, label)) / 2, y + 1, f_item, f ? C_SEL : C_TEXT, label);
   return hit;
 }
@@ -150,8 +163,8 @@ bool gfx_button(int x, int y, int w, const char *label) {
 bool gfx_check(int x, int y, const char *label, int *v) {
   bool f, hit = widget(x, y, 16 + text_w(f_item, label), 13, &f);
   if (f) sparkle(x - 7, y + 6);
-  panel(x, y + 1, 11, 11, C_INSET, f ? C_SEL : C_EDGE);
-  if (*v) fill(x + 3, y + 4, 5, 5, C_LCD);
+  plate(x, y + 1, 11, 11);
+  if (*v) fill(x + 3, y + 4, 5, 5, RGB(148, 222, 0));
   text(x + 16, y, f_item, f ? C_SEL : C_TEXT, label);
   if (hit) *v = !*v;
   return hit;

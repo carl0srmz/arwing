@@ -112,21 +112,22 @@ static void draw_settings(bool in_game) {
   for (int i = 0; i < nitems; i++) {
     Item *it = &items[i];
     bool en = item_enabled(it), s = i == sel;
-    if (s || i == hover) fill(x0 + 2, y, lw - 4, lh - 1, s ? C_ROW : RGB(44, 54, 128));
+    if (s || i == hover) fill(x0 + 3, y, lw - 6, lh - 1, s ? C_ROW : RGB(48, 66, 84));
     if (s) sparkle(x0 + 9, y + lh / 2);
     text(x0 + 17, y + (lh - 13) / 2, f_item, !en ? C_DIM : s ? C_SEL : C_TEXT, it->label);
     if (it->val) {
       Rect v = { vx, y + 2, vw, lh - 4 };
-      fill(v.x, v.y, v.w, v.h, C_INSET);
-      COLORREF c = en ? C_LCD : C_DIM;
+      plate(v.x, v.y, v.w, v.h);
+      if (!en) fill(v.x + 1, v.y + 1, v.w - 2, v.h - 2, C_SHADE);
+      COLORREF c = !en ? RGB(160, 160, 172) : s ? C_SEL : C_LCD;
       if (it->type == IT_SLIDER && it->val != &cfg.ff_speed) {
         int segs = 10, sw = (v.w - 4) / segs, on = (*it->val - it->min) * segs / (it->max - it->min);
-        for (int k = 0; k < segs; k++) fill(v.x + 2 + k * sw, v.y + 2, sw - 1, v.h - 4, k < on ? c : RGB(24, 32, 72));
+        for (int k = 0; k < segs; k++) fill(v.x + 2 + k * sw, v.y + 2, sw - 1, v.h - 4, k < on ? c : en ? C_SHADE : RGB(74, 74, 82));
       } else {
         char b[32];
         if (it->type == IT_SLIDER) snprintf(b, sizeof b, "%dx", *it->val); else snprintf(b, sizeof b, "%s", it->choices[*it->val]);
         text(v.x + (v.w - text_w(f_item, b)) / 2, v.y + (v.h - 13) / 2, f_item, c, b);
-        if (s && en) { text(v.x + 2, v.y + (v.h - 13) / 2, f_item, C_TAB, "<"); text_r(v.x + v.w - 2, v.y + (v.h - 13) / 2, f_item, C_TAB, ">"); }
+        if (s && en) { text(v.x + 3, v.y + (v.h - 13) / 2, f_item, C_ARROW, "<"); text_r(v.x + v.w - 3, v.y + (v.h - 13) / 2, f_item, C_ARROW, ">"); }
       }
     }
     y += lh;
@@ -136,9 +137,9 @@ static void draw_settings(bool in_game) {
   tab(pr.x + 4, pr.y - 10, items[sel].scene == -2 ? "SOUND" : "MONITOR");
   if (items[sel].scene != -2) text_r(pr.x + pr.w, pr.y + pr.h + 6, f_tab, C_DIM, "Tab: other scene");
   Rect cr = comm_rect();
-  panel(cr.x, cr.y, cr.w, cr.h, C_COMM, C_TEXT);
-  text_wrap((Rect){ cr.x + 6, cr.y + 4, cr.w - 16, cr.h - 6 }, f_small, C_TEXT, items[sel].help);
-  if (GetTickCount() / 400 % 2) for (int k = 0; k < 3; k++) fill(cr.x + cr.w - 10 + k, cr.y + cr.h - 8 + k, 5 - 2 * k, 1, C_SEL);
+  lime(cr.x, cr.y, cr.w, cr.h);
+  text_wrap((Rect){ cr.x + 8, cr.y + 5, cr.w - 20, cr.h - 8 }, f_small, C_TEXT, items[sel].help);
+  if (GetTickCount() / 400 % 2) for (int k = 0; k < 3; k++) fill(cr.x + cr.w - 12 + k, cr.y + cr.h - 10 + k, 5 - 2 * k, 1, C_ARROW);
   text(x0 + 2, ch - 13, f_tab, C_DIM, in_game ? "Arrows move   Enter picks   Esc resumes" : "Arrows move   Enter picks   Mouse and pads work too");
 }
 
@@ -150,17 +151,17 @@ static void draw_controls(void) {
   tab(x0 + 8, TOP - 2, "CONTROLS"); tab(c1, TOP - 2, "KEY"); tab(c2, TOP - 2, "PAD");
   for (int i = 0; i <= BIND_COUNT + 1; i++) {
     bool s = i == csel;
-    if (s) fill(x0 + 2, y, w - 4, lh - 1, C_ROW);
+    if (s) fill(x0 + 3, y, w - 6, lh - 1, C_ROW);
     if (s) sparkle(x0 + 9, y + lh / 2);
     int ty = y + (lh - 13) / 2;
     if (i < BIND_COUNT) {
       text(x0 + 17, ty, f_item, s ? C_SEL : C_TEXT, bind_names[i]);
       const char *kn = (s && capture == 1) ? "Press a key" : key_name(cfg.key[i]);
       const char *pn = (s && capture == 2) ? "Press a button" : (cfg.pad[i] > 0 ? pad_button_names[cfg.pad[i] - 1] : "-");
-      if (s && ccol == 0) fill(c1 - 2, y + 1, c2 - c1 - 8, lh - 3, C_INSET);
-      if (s && ccol == 1) fill(c2 - 2, y + 1, x0 + w - c2 - 4, lh - 3, C_INSET);
-      text(c1 + 2, ty, f_item, s && ccol == 0 ? C_LCD : C_TAB, kn);
-      text(c2 + 2, ty, f_item, s && ccol == 1 ? C_LCD : C_TAB, pn);
+      if (s && ccol == 0) plate(c1 - 2, y + 1, c2 - c1 - 8, lh - 2);
+      if (s && ccol == 1) plate(c2 - 2, y + 1, x0 + w - c2 - 6, lh - 2);
+      text(c1 + 2, ty, f_item, s && ccol == 0 ? C_SEL : C_TAB, kn);
+      text(c2 + 2, ty, f_item, s && ccol == 1 ? C_SEL : C_TAB, pn);
     } else text(x0 + 17, ty, f_item, s ? C_SEL : C_TEXT, i == BIND_COUNT ? "Reset to defaults" : "Back");
     y += lh;
   }
@@ -261,7 +262,7 @@ UiResult ui_frame(bool in_game) {
     const char *l = update_label();
     int w = text_w(f_tab, l) + 10;
     ubtn = (Rect){ cw - 8 - w, ch - 15, w, 13 };
-    if (update_ready()) { panel(ubtn.x, ubtn.y, w, 13, C_ROW, C_SEL); text(ubtn.x + 5, ubtn.y + 1, f_tab, C_SEL, l); }
+    if (update_ready()) { lime(ubtn.x - 3, ubtn.y - 3, w + 6, 19); text(ubtn.x + 5, ubtn.y + 1, f_tab, C_TEXT, l); }
     else text_r(cw - 8, ch - 13, f_tab, C_DIM, l);
   }
   Rect pr = preview_rect();
@@ -280,7 +281,7 @@ UiResult ui_frame(bool in_game) {
     video_draw_game(&cfg, pr, 0, 0, 1, 1);
     int iw = pr.w / 3, ih = pr.h / 3;
     Rect ir = { pr.x + pr.w - iw - 4 * px, pr.y + pr.h - ih - 4 * px, iw, ih };
-    static const u32 edge = 0xff88a0e8;
+    static const u32 edge = 0xffa5b5c6;
     video_draw_rgba(&edge, 1, 1, (Rect){ ir.x - px, ir.y - px, ir.w + 2 * px, ir.h + 2 * px }, false);
     float cxu = s == 1 ? 0.40f : 0.45f, cyv = s == 1 ? 0.45f : 0.22f, du = 0.5f / 6, dv = 0.5f / 6 * ((float)ih / iw) * (4.0f / 3);
     video_draw_game(&cfg, ir, cxu - du, cyv - dv, cxu + du, cyv + dv);
