@@ -230,7 +230,7 @@ neither is anything extracted from a ROM.
 
 **Unofficial fan project and intellectual property notice**
 
-This is an independent, unofficial software project. It is not affiliated with, endorsed by, or sponsored by Nintendo or SEGA.
+This is an independent, unofficial software project. It is not affiliated with, endorsed by, or sponsored by Nintendo.
 
 Star Fox and all associated trademarks and copyrighted game content belong to their respective rights holders. Any gameplay screenshots included in this README are used to document and compare technical features of the software.
 
