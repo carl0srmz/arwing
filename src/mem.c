@@ -50,6 +50,31 @@ static int speed(u32 a) {
 static void hdma_init(void);
 static void hdma_run(void);
 
+// Game logic runs once per drawn frame, so a faster SuperFX speeds the whole game up.
+// Keep the original timing and only boost SuperFX + CPU once a frame has taken pace_cap vblanks.
+#define PACE_FRAMER 0x16a3      // written once per game frame by the transfer loop
+#define PACE_FLAGS 0x14d6       // pshipflags; psf_noctrl is set during cutscenes
+#define PACE_NOCTRL 0x20
+#define PACE_GSU_MUL 8          // SuperFX at 32x while boosting
+#define PACE_CPU_MUL 64         // CPU at 4x while boosting
+int pace_cap;
+static int pace_vbl = 255;
+static bool pace_boost;
+static u32 pace_cfrac;
+extern u32 gsu_mul, gsu_base_mul;
+
+static void pace_set(bool on) {
+  if (on == pace_boost) return;
+  pace_boost = on; pace_cfrac = 0;
+  gsu_mul = on ? PACE_GSU_MUL : gsu_base_mul;
+}
+static void pace_vblank(void) {
+  if (pace_vbl < 255) pace_vbl++;
+  pace_set(pace_cap && pace_vbl >= pace_cap && pace_vbl <= pace_cap + 2 && !(wram[PACE_FLAGS] & PACE_NOCTRL));
+}
+static inline void pace_write(u32 w) { if (w == PACE_FRAMER) { pace_vbl = 0; pace_set(false); } }
+void pace_reset(void) { pace_vbl = 255; pace_set(false); }
+
 static void new_line(void) {
   hcount -= LINE_MC;
   apu_catchup();
@@ -64,6 +89,7 @@ static void new_line(void) {
     if (nmitimen & 0x80) nmi_pending = true;
     if (nmitimen & 1) { joy_auto[0] = pad_state[0]; joy_auto[1] = pad_state[1]; }
     frame_done = true;
+    pace_vblank();
   }
 }
 
@@ -92,8 +118,13 @@ static void tick(int c) {
   if (hcount >= LINE_MC) new_line();
 }
 
-void bus_idle(void) { tick(6); }
-void bus_fetch(u16 a, int n, u8 last) { int s = speed((cpu.pb << 16) | a); while (n--) tick(s); mdr = last; }
+static inline void ctick(int c) {
+  if (pace_boost) { u32 t = pace_cfrac + c * PACE_CPU_MUL; c = t >> 8; pace_cfrac = t & 255; }
+  tick(c);
+}
+
+void bus_idle(void) { ctick(6); }
+void bus_fetch(u16 a, int n, u8 last) { int s = speed((cpu.pb << 16) | a); while (n--) ctick(s); mdr = last; }
 
 static u8 io_read(u16 a) {
   switch (a) {
@@ -203,7 +234,7 @@ static u8 mem_read(u32 a, bool side) {
 static void mem_write(u32 a, u8 v) {
   u8 b = a >> 16; u16 o = (u16)a;
   if ((b & 0x7f) < 0x40) {
-    if (o < 0x2000) { wram[o] = v; return; }
+    if (o < 0x2000) { wram[o] = v; pace_write(o); return; }
     if (o >= 0x8000) return;
     if (o >= 0x6000) { gsu_ram[o & 0x1fff] = v; if (hd_active_scale) hd_gsu_ram_written(o & 0x1fff); return; }
     if (o >= 0x3000 && o < 0x3500) { gsu_write(o, v); return; }
@@ -211,7 +242,7 @@ static void mem_write(u32 a, u8 v) {
     if (o >= 0x4000 && o < 0x4400) { io_write(o, v); return; }
     return;
   }
-  if (b == 0x7e || b == 0x7f) { wram[a & 0x1ffff] = v; return; }
+  if (b == 0x7e || b == 0x7f) { wram[a & 0x1ffff] = v; pace_write(a & 0x1ffff); return; }
   if ((b & 0x7e) == 0x70) { gsu_ram[a & 0xffff] = v; if (hd_active_scale) hd_gsu_ram_written(a); return; }
 }
 
@@ -230,7 +261,7 @@ int rom_offset(u32 a) {
 static u32 src_of(u32 a) { int r = rom_offset(a); if (r >= 0) return r + 1; int w = wram_index(a); return w >= 0 ? wram_src[w] : 0; }
 
 u8 bus_read(u32 a) {
-  tick(speed(a)); mdr = mem_read(a, true);
+  ctick(speed(a)); mdr = mem_read(a, true);
   if (wram_src && !cpu_fetching) {
     if (rdq_id != cpu_instr_id) { rdq_n = 0; rdq_id = cpu_instr_id; }
     if (rdq_n < 4) { rdq[rdq_n].v = mdr; rdq[rdq_n].used = false; rdq[rdq_n].src = src_of(a); rdq_n++; }
@@ -238,7 +269,7 @@ u8 bus_read(u32 a) {
   return mdr;
 }
 void bus_write(u32 a, u8 v) {
-  tick(speed(a)); mdr = v;
+  ctick(speed(a)); mdr = v;
   int w;
   if (wram_src && (w = wram_index(a)) >= 0) {
     u32 src = 0;
@@ -343,7 +374,7 @@ void snes_set_pad(int port, u16 buttons) { pad_state[port & 1] = buttons; }
 void snes_init(void) {
   memset(wram, 0x55, sizeof wram);
   ppu_reset(); apu_reset(); gsu_reset();
-  hcount = 0; vcount = 0;
+  hcount = 0; vcount = 0; pace_reset();
   cpu_reset();
 }
 
@@ -365,6 +396,7 @@ void mem_serialize(Ser *s) {
   SER(s, htime); SER(s, vtime); SER(s, rdnmi); SER(s, vblank); SER(s, hdma_inited); SER(s, rendered);
   SER(s, hdma_done); SER(s, irq_fired_line); SER(s, nmi_pending); SER(s, timeup); SER(s, joy_auto);
   SER(s, joy_latch); SER(s, joy_strobe); SER(s, dma); SER(s, hdmaen);
+  if (s->load) pace_reset();
 }
 
 void snes_serialize(Ser *s) {

@@ -49,7 +49,7 @@ void cfg_load(const char *path) {
   if (cfg.filter < 0 || cfg.filter >= FILT_COUNT) cfg.filter = FILT_SMOOTH;
   if (cfg.aspect < 0 || cfg.aspect >= ASPECT_COUNT) cfg.aspect = ASPECT_4_3;
   if (cfg.hd3d < 1 || cfg.hd3d > 4) cfg.hd3d = 1;
-  if (cfg.superfx < 0 || cfg.superfx > 1) cfg.superfx = 0;
+  if (cfg.superfx < 0 || cfg.superfx > 2) cfg.superfx = 0;
 }
 
 void cfg_save(const char *path) {

@@ -155,7 +155,7 @@ void gsu_reset(void) {
 bool gsu_running(void) { return (g.sfr & SG) != 0; }
 bool gsu_irq(void) { return (g.sfr & SIRQ) != 0; }
 
-u32 gsu_mul = 256;
+u32 gsu_mul = 256, gsu_base_mul = 256;
 
 void gsu_catchup(void) {
   if (!(g.sfr & SG)) { g.clock = master_clock; return; }
