@@ -53,8 +53,7 @@ static void hdma_run(void);
 // Game logic runs once per drawn frame, so a faster SuperFX speeds the whole game up.
 // Keep the original timing and only boost SuperFX + CPU once a frame has taken pace_cap vblanks.
 #define PACE_FRAMER 0x16a3      // written once per game frame by the transfer loop
-#define PACE_FLAGS 0x14d6       // pshipflags; psf_noctrl is set during cutscenes
-#define PACE_NOCTRL 0x20
+#define PACE_PLAYING() (!(wram[0x14d6] & 0x20))   // psf_noctrl clear: not a cutscene
 #define PACE_GSU_MUL 8          // SuperFX at 32x while boosting
 #define PACE_CPU_MUL 64         // CPU at 4x while boosting
 int pace_cap;
@@ -70,7 +69,7 @@ static void pace_set(bool on) {
 }
 static void pace_vblank(void) {
   if (pace_vbl < 255) pace_vbl++;
-  pace_set(pace_cap && pace_vbl >= pace_cap && pace_vbl <= pace_cap + 2 && !(wram[PACE_FLAGS] & PACE_NOCTRL));
+  pace_set(pace_cap && pace_vbl >= pace_cap && pace_vbl <= pace_cap + 2 && PACE_PLAYING());
 }
 static inline void pace_write(u32 w) { if (w == PACE_FRAMER) { pace_vbl = 0; pace_set(false); } }
 void pace_reset(void) { pace_vbl = 255; pace_set(false); }
