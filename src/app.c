@@ -156,7 +156,7 @@ static void load_state(void) {
   fseek(f, 0, SEEK_END); long n = ftell(f); fseek(f, 0, SEEK_SET);
   Ser s = { malloc(n), 0, (size_t)n, true }; fread(s.buf, 1, n, f); fclose(f);
   snes_serialize(&s); free(s.buf);
-  hd_reset();
+  snes_state_loaded(); hd_reset();
   osd_message("Loaded state %d", slot);
 }
 static void write_bmp32(const char *p, const u32 *pix, int w, int h) {
@@ -269,13 +269,13 @@ int app_run(void) {
         if (!in_game || res == UI_RESET) {
           if (th) { plat_join(th); th = NULL; }
           static u8 keep[0x10000]; if (in_game) memcpy(keep, gsu_ram, sizeof keep);
-          power.load = true; power.pos = 0; snes_serialize(&power);
+          power.load = true; power.pos = 0; snes_serialize(&power); snes_state_loaded();
           if (in_game) memcpy(gsu_ram, keep, sizeof keep);
           s16 junk[4096]; while (apu_take_samples(junk, 2048) > 0) {}
           in_game = true;
         }
         hd_scale = cfg.hd3d >= 2 ? cfg.hd3d : 0; hd_reset();
-        { extern int pace_cap; static const int caps[] = { 0, 4, 3 }; pace_cap = caps[cfg.superfx]; }
+        { extern int pace_cap; extern bool smooth_on; smooth_on = cfg.superfx == 1; pace_cap = smooth_on ? 3 : 0; smooth_reset(); }
         cfg_save("starfox.ini");
         audio_stop_clip();
         mode = M_GAME; paused = false; input_flush_edges();
@@ -298,7 +298,7 @@ int app_run(void) {
     if (!paused) {
       snes_set_pad(0, input_snes_mask());
       if (ff) {
-        for (int i = 0; i < (uitest_prefix ? 25 : cfg.ff_speed); i++) { snes_run_frame(); frames++; }
+        for (int i = 0; i < (uitest_prefix ? 25 : cfg.ff_speed); i++) { snes_run_frame(); smooth_frame_end(); frames++; }
         s16 junk[8192]; while (apu_take_samples(junk, 4096) > 0) {}
         t0 = plat_time(); next_frame = 0;
       } else if (snd) {
@@ -306,17 +306,18 @@ int app_run(void) {
         double adj = 1 + (q - target) / target * 0.005;
         if (adj < 0.995) adj = 0.995; if (adj > 1.005) adj = 1.005;
         while ((next_frame <= el || audio_queued() < ABUF_FRAMES) && frames < 4) {
-          snes_run_frame(); frames++; next_frame += frame_time * adj;
+          smooth_frame_begin(); snes_run_frame(); smooth_frame_end(); frames++; next_frame += frame_time * adj;
           s16 tmp[8192]; int n = apu_take_samples(tmp, 4096); audio_ring_add(tmp, n); audio_submit();
         }
         if (el - next_frame > 0.25 || next_frame - el > 0.25) next_frame = el;
       } else {
         double el = plat_time() - t0;
-        while (next_frame <= el && frames < 4) { snes_run_frame(); frames++; next_frame += frame_time; }
+        while (next_frame <= el && frames < 4) { smooth_frame_begin(); snes_run_frame(); smooth_frame_end(); frames++; next_frame += frame_time; }
         if (el - next_frame > 0.25) next_frame = el;
         s16 junk[8192]; while (apu_take_samples(junk, 4096) > 0) {}
       }
     }
+    if (frames && !ff) smooth_present();
     if (frames || !shown) {
       int hn = hd_active_scale;
       build_source(framebuf, ppu_hdmask, hn ? hd_framebuf : NULL, hn, &cfg, &shown, &shown_w, &shown_h);

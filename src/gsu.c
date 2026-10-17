@@ -156,9 +156,11 @@ bool gsu_running(void) { return (g.sfr & SG) != 0; }
 bool gsu_irq(void) { return (g.sfr & SIRQ) != 0; }
 
 u32 gsu_mul = 256, gsu_base_mul = 256;
+bool gsu_skip_run;
 
 void gsu_catchup(void) {
   if (!(g.sfr & SG)) { g.clock = master_clock; return; }
+  if (gsu_skip_run) { g_stop(); g.clock = master_clock; return; }
   while ((g.sfr & SG) && g.clock < master_clock) {
     if (grc_enabled && grc_try()) continue;
     gsu_step();

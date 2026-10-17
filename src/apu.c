@@ -77,6 +77,7 @@ static const u16 gauss[512] = {
 1299,1300,1300,1301,1302,1302,1303,1303,1303,1304,1304,1304,1304,1304,1305,1305
 };
 static s16 outbuf[8192 * 2]; static int out_w, out_r;
+static bool apu_silent;
 int apu_hq;
 bool apu_dual;
 static s16 outbuf2[8192 * 2]; static int out2_w, out2_r;
@@ -590,10 +591,11 @@ void apu_catchup(void) {
     spc_cycles += c;
     timers(c);
     sample_clock += c;
-    while (sample_clock >= 32) { sample_clock -= 32; dsp_sample(); }
+    while (sample_clock >= 32) { sample_clock -= 32; if (!apu_silent) dsp_sample(); }
   }
 }
 
+void apu_set_silent(bool on) { apu_silent = on; }
 u8 apu_read(int port) { return out_port[port & 3]; }
 void apu_write(int port, u8 v) { in_port[port & 3] = v; }
 

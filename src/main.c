@@ -121,6 +121,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--state") && i + 1 < argc) state_file = argv[++i];
     else if (!strcmp(argv[i], "--gsuoc") && i + 1 < argc) { extern u32 gsu_mul, gsu_base_mul; gsu_mul = gsu_base_mul = 256 / atoi(argv[++i]); }
     else if (!strcmp(argv[i], "--pace") && i + 1 < argc) { extern int pace_cap; pace_cap = atoi(argv[++i]); }
+    else if (!strcmp(argv[i], "--smooth")) { extern int pace_cap; extern bool smooth_on; smooth_on = true; pace_cap = 3; }
     else if (!strcmp(argv[i], "--savestate") && i + 2 < argc) { save_frame = atoi(argv[++i]); save_file = argv[++i]; }
     else rom_path = argv[i];
   }
@@ -148,13 +149,13 @@ int main(int argc, char **argv) {
   if (sf) {
     fseek(sf, 0, SEEK_END); long n = ftell(sf); fseek(sf, 0, SEEK_SET);
     Ser st = { malloc(n), 0, (size_t)n, true }; fread(st.buf, 1, n, sf); fclose(sf);
-    snes_serialize(&st); free(st.buf); hd_reset();
+    snes_serialize(&st); free(st.buf); snes_state_loaded(); hd_reset();
   }
 
   if (frames >= 0) {
     for (int f = 0; f < frames; f++) {
       snes_set_pad(0, script_pad(f));
-      snes_run_frame();
+      smooth_frame_begin(); snes_run_frame(); smooth_frame_end(); smooth_present();
       if (wav) { static s16 sb[4096 * 2]; int n = apu_take_samples(sb, 4096); fwrite(sb, 4, n, wav); wav_frames += n; }
       if (f == save_frame) { Ser st = { 0 }; snes_serialize(&st); FILE *wf = fopen(save_file, "wb"); if (wf) { fwrite(st.buf, 1, st.pos, wf); fclose(wf); } free(st.buf); }
       if (f == wramdump_frame) { FILE *wf = fopen("out/wramdump.bin", "wb"); fwrite(wram, 1, sizeof wram, wf); fclose(wf); }

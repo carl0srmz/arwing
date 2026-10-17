@@ -60,6 +60,7 @@ int pace_cap;
 static int pace_vbl = 255;
 static bool pace_boost;
 static u32 pace_cfrac;
+static bool pace_off;
 extern u32 gsu_mul, gsu_base_mul;
 
 static void pace_set(bool on) {
@@ -68,11 +69,24 @@ static void pace_set(bool on) {
   gsu_mul = on ? PACE_GSU_MUL : gsu_base_mul;
 }
 static void pace_vblank(void) {
+  if (pace_off) return;
   if (pace_vbl < 255) pace_vbl++;
   pace_set(pace_cap && pace_vbl >= pace_cap && pace_vbl <= pace_cap + 2 && PACE_PLAYING());
 }
-static inline void pace_write(u32 w) { if (w == PACE_FRAMER) { pace_vbl = 0; pace_set(false); } }
+void pace_clone(bool on) {
+  static bool b; static u32 f, m;
+  if (on) { b = pace_boost; f = pace_cfrac; m = gsu_mul; pace_boost = false; }
+  else { pace_boost = b; pace_cfrac = f; gsu_mul = m; }
+  pace_off = on;
+}
+extern bool smooth_snap_due, ppu_skip;
+void smooth_wram_write(u32 a, u8 v); void smooth_snapshot(void); void smooth_bg12nba(u8 v); void smooth_line1(void);
+static inline void wram_hook(u32 w, u8 v) {
+  if (w == PACE_FRAMER && !pace_off) { pace_vbl = 0; pace_set(false); }
+  if (w == 0x15a4 || w == 0x0000 || w == 0x18bb) smooth_wram_write(w, v);
+}
 void pace_reset(void) { pace_vbl = 255; pace_set(false); }
+void snes_state_loaded(void) { pace_reset(); smooth_reset(); }
 
 static void new_line(void) {
   hcount -= LINE_MC;
@@ -108,7 +122,8 @@ static void tick(int c) {
   if (!rendered && hcount >= RENDER_HC) {
     rendered = true;
     int last = ppu_overscan ? 239 : 224;
-    if (vcount >= 1 && vcount <= last) ppu_render_line(vcount);
+    if (vcount == 1) smooth_line1();
+    if (vcount >= 1 && vcount <= last && !ppu_skip) ppu_render_line(vcount);
   }
   if (!hdma_done && hcount >= HDMA_HC) {
     hdma_done = true;
@@ -199,7 +214,7 @@ static u8 bbus_read(u8 r) {
   return mdr;
 }
 static void bbus_write(u8 r, u8 v) {
-  if (r < 0x40) { ppu_write(0x2100 | r, v); return; }
+  if (r < 0x40) { if (r == 0x0b) smooth_bg12nba(v); ppu_write(0x2100 | r, v); return; }
   if (r < 0x80) { apu_catchup(); apu_write(r & 3, v); return; }
   switch (r) {
   case 0x80: wram[wmadd] = v; wmadd = (wmadd + 1) & 0x1ffff; break;
@@ -233,7 +248,7 @@ static u8 mem_read(u32 a, bool side) {
 static void mem_write(u32 a, u8 v) {
   u8 b = a >> 16; u16 o = (u16)a;
   if ((b & 0x7f) < 0x40) {
-    if (o < 0x2000) { wram[o] = v; pace_write(o); return; }
+    if (o < 0x2000) { wram[o] = v; wram_hook(o, v); return; }
     if (o >= 0x8000) return;
     if (o >= 0x6000) { gsu_ram[o & 0x1fff] = v; if (hd_active_scale) hd_gsu_ram_written(o & 0x1fff); return; }
     if (o >= 0x3000 && o < 0x3500) { gsu_write(o, v); return; }
@@ -241,7 +256,7 @@ static void mem_write(u32 a, u8 v) {
     if (o >= 0x4000 && o < 0x4400) { io_write(o, v); return; }
     return;
   }
-  if (b == 0x7e || b == 0x7f) { wram[a & 0x1ffff] = v; pace_write(a & 0x1ffff); return; }
+  if (b == 0x7e || b == 0x7f) { wram[a & 0x1ffff] = v; wram_hook(a & 0x1ffff, v); return; }
   if ((b & 0x7e) == 0x70) { gsu_ram[a & 0xffff] = v; if (hd_active_scale) hd_gsu_ram_written(a); return; }
 }
 
@@ -384,6 +399,7 @@ void snes_run_frame(void) {
     if (nmi_pending) { nmi_pending = false; cpu_nmi(); continue; }
     if (irq && !(cpu.p & FI)) { cpu_irq(); continue; }
     if (cpu.wai && irq) cpu.wai = 0;
+    if (smooth_snap_due) smooth_snapshot();
     if (rc_enabled && !cpu.wai && !cpu.stp && rc_try()) continue;
     cpu_step();
   }
@@ -395,7 +411,6 @@ void mem_serialize(Ser *s) {
   SER(s, htime); SER(s, vtime); SER(s, rdnmi); SER(s, vblank); SER(s, hdma_inited); SER(s, rendered);
   SER(s, hdma_done); SER(s, irq_fired_line); SER(s, nmi_pending); SER(s, timeup); SER(s, joy_auto);
   SER(s, joy_latch); SER(s, joy_strobe); SER(s, dma); SER(s, hdmaen);
-  if (s->load) pace_reset();
 }
 
 void snes_serialize(Ser *s) {

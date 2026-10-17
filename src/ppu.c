@@ -421,6 +421,12 @@ void ppu_render_line(int line) {
   }
 }
 
+// What smooth.c borrows from the real machine for an interpolated frame: palette, sprites, colour math.
+typedef struct { u16 cgram[256]; u8 oam[544]; u16 fixed_color; u8 cgwsel, cgadsub, obsel; } Ppu2d;
+static Ppu2d p2d;
+void ppu_keep_2d(void) { memcpy(p2d.cgram, cgram, sizeof cgram); memcpy(p2d.oam, oam, sizeof oam); p2d.fixed_color = fixed_color; p2d.cgwsel = cgwsel; p2d.cgadsub = cgadsub; p2d.obsel = obsel; }
+void ppu_use_2d(void) { memcpy(cgram, p2d.cgram, sizeof cgram); memcpy(oam, p2d.oam, sizeof oam); fixed_color = p2d.fixed_color; cgwsel = p2d.cgwsel; cgadsub = p2d.cgadsub; obsel = p2d.obsel; }
+
 void ppu_serialize(Ser *s) {
   SER(s, vram); SER(s, cgram); SER(s, oam); SER(s, ppu_inidisp); SER(s, ppu_overscan);
   SER(s, obsel); SER(s, bgmode); SER(s, mosaic); SER(s, bgsc); SER(s, bgnba); SER(s, vmain); SER(s, m7sel); SER(s, setini);
