@@ -66,7 +66,7 @@ void smooth_wram_write(u32 a, u8 v) {
   tick_write(a, v);
   // Once the copy's image is in VRAM, the SuperFX would only draw a frame we never show.
   if (is_sent(a, v) && emu_clone && cl_pend_ok && cl_pend_tick == cl_target) gsu_skip_run = true;
-  if (is_snap(a, v) && !emu_clone && smooth_on) smooth_snap_due = true;
+  if (is_snap(a, v) && !emu_clone && smooth_on && blend_words(wram, NULL) >= 0) smooth_snap_due = true;
   if (is_send(a, v)) {
     if (emu_clone) { cl_pend_ok = true; cl_pend_tick = sent_tick(); }
     else { pend_ok = true; pend_tick = sent_tick(); }
