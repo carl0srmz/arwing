@@ -22,7 +22,9 @@ static const u8 sm_rot[3] = { 0x12, 0x13, 0x14 };   // x/y/z angle bytes
 // Camera inputs read by getview: pviewpos x/y/z + z offset, viewfloat x/y, outv x/y/z angles, outdist,
 // player_turnrot, and the player's x/y/z rotation.
 static const u16 sm_words[] = { 0x14f6, 0x14f8, 0x14fa, 0x14fe, 0x14e6, 0x14e8, 0x18c5, 0x18c7, 0x18c9, 0x18cb,
-                                0x152a, 0x1230, 0x1232, 0x1234 };
+                                0x152a, 0x1230, 0x1232, 0x1234,
+                                0x00c1, 0x00c3, 0x00c5,   // position of the object the camera looks at
+                                0x169c };                 // cutscene camera
 static int blend_words(const u8 *B, const u16 **w) { (void)B; if (w) *w = sm_words; return sizeof sm_words / sizeof *sm_words; }
 static bool same_kind(const u8 *A, const u8 *B, u32 o) { return rd16(A, o + 4) == rd16(B, o + 4) && A[o + 9] == B[o + 9]; }
 static u16 tick_now(void) { return rd16(wram, 0x15bb); }               // gameframe, +1 per dostrats
@@ -168,6 +170,7 @@ static void blend(const u8 *A, const u8 *B, int num, int den) {
     if (!ona[i] || !onb[i]) continue;
     u32 o = SM_AL0 + i * SM_ALSZ;
     if (i && !same_kind(A, B, o)) continue;
+    if (i) restore_obj(A, o, true);   // animation and state stay the older tick's, as on the real frames
     bool jump = false;
     for (int k = 0; k < 3; k++) { s16 d = (s16)(rd16(B, o + SM_POS + k * 2) - rd16(A, o + SM_POS + k * 2)); if (d > 2000 || d < -2000) jump = true; }
     if (jump) continue;
@@ -183,6 +186,7 @@ void apu_set_silent(bool on);
 void pace_clone(bool on);
 
 extern int ppu_blend_num, ppu_blend_den;
+u8 ppu_get_nba(void);
 static bool clone_frame(Snap *A, Snap *B, int num, int den) {
   ppu_blend_num = num; ppu_blend_den = den;
   real.pos = 0; real.load = false;
@@ -192,6 +196,7 @@ static bool clone_frame(Snap *A, Snap *B, int num, int den) {
   emu_clone = true; ppu_skip = true; apu_set_silent(true); hd_ctx(1);
   u8 nba = last_nba;
   B->st.pos = 0; B->st.load = true; snes_serialize(&B->st);
+  last_nba = ppu_get_nba();   // swaps are judged against the copy's own screen, not the real machine's
   tick_set(B->tick);
   blend(A->wram, B->wram, num, den);
   freeze();

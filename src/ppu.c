@@ -445,7 +445,6 @@ void ppu_regs_keep(int y) {
   memcpy(l->bghofs, bghofs, sizeof bghofs); memcpy(l->bgvofs, bgvofs, sizeof bgvofs); l->fixed_color = fixed_color;
 }
 int ppu_blend_num, ppu_blend_den = 1;
-static int lerp_n(int a, int b) { return a + (b - a) * ppu_blend_num / ppu_blend_den; }
 static u16 lerp_scroll(u16 a, u16 b) {
   if ((a | b) > 0x3ff) return a;
   int d = (b - a) & 0x3ff;
@@ -453,20 +452,19 @@ static u16 lerp_scroll(u16 a, u16 b) {
   return (u16)((a + d * ppu_blend_num / ppu_blend_den) & 0x3ff);
 }
 // The copy's own values are the next tick's; the flags and layer setup come from the real frame, and what the
-// game steps once per tick (brightness, scroll) is moved from the real frame's value to the copy's.
+// game steps once per tick (scroll) is moved from the real frame's value to the copy's.
 void ppu_regs_use(int y) {
   LineRegs *l = &lregs[y];
-  int br = l->inidisp & 15;
-  if (!((ppu_inidisp | l->inidisp) & 0x80)) br = lerp_n(br, ppu_inidisp & 15);
   u16 hs[4], vs[4];
   for (int i = 0; i < 4; i++) { hs[i] = lerp_scroll(l->bghofs[i], bghofs[i]); vs[i] = lerp_scroll(l->bgvofs[i], bgvofs[i]); }
 #define U(f, v) v = l->f;
   LR_BYTES(U)
 #undef U
-  ppu_inidisp = (l->inidisp & 0xf0) | br;
   memcpy(bgsc, l->bgsc, sizeof bgsc); memcpy(wsel, l->wsel, sizeof wsel); memcpy(wh, l->wh, sizeof wh); fixed_color = l->fixed_color;
   memcpy(bghofs, hs, sizeof hs); memcpy(bgvofs, vs, sizeof vs);
 }
+
+u8 ppu_get_nba(void) { return bgnba[0]; }
 
 void ppu_serialize(Ser *s) {
   SER(s, vram); SER(s, cgram); SER(s, oam); SER(s, ppu_inidisp); SER(s, ppu_overscan);
