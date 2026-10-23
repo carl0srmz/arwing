@@ -57,14 +57,38 @@ void ppu_keep_2d(void), ppu_use_2d(void);
 
 // The game's 2D layer (palette, sprites, flashes) runs a tick ahead of the 3D image and the copy's logic is
 // frozen, so an interpolated frame takes the 2D state the real machine shows at the start of that frame.
+// Fades step the brightness once every few frames. Once two equal steps at equal intervals have gone by, ease
+// towards the next step over the interval so the fade moves every frame.
+extern int ppu_br16, ppu_br_base;
+static struct { int val; long frame; } fade[3]; static int fade_n;
+static void fade_track(void) {
+  extern u8 ppu_inidisp;
+  ppu_br16 = -1;
+  if (ppu_inidisp & 0x80) { fade_n = 0; return; }
+  int b = ppu_inidisp & 15;
+  if (!fade_n || fade[fade_n - 1].val != b) {
+    if (fade_n == 3) { fade[0] = fade[1]; fade[1] = fade[2]; fade_n = 2; }
+    fade[fade_n].val = b; fade[fade_n].frame = frame_no; fade_n++;
+  }
+  if (fade_n < 3) return;
+  int s1 = fade[1].val - fade[0].val, s2 = fade[2].val - fade[1].val;
+  long p1 = fade[1].frame - fade[0].frame, p2 = fade[2].frame - fade[1].frame;
+  if (!s2 || s1 != s2 || p2 < 2 || p1 < p2 - 1 || p1 > p2 + 1) return;
+  long t = frame_no - fade[2].frame;
+  if (t > p2 + 1) return;   // the next step is overdue: the fade is over
+  if (t > p2) t = p2;
+  int v = fade[2].val * 16 + (int)(s2 * 16 * t / p2);
+  ppu_br16 = v < 0 ? 0 : v > 240 ? 240 : v; ppu_br_base = fade[2].val;
+}
+static int fade_keep = -1, fade_keep_base;
 void smooth_line1(void) {
-  if (!emu_clone) { if (smooth_on) ppu_keep_2d(); }
-  else if (cl_capture) ppu_use_2d();
+  if (!emu_clone) { if (smooth_on) ppu_keep_2d(); else ppu_br16 = -1; }
+  else if (cl_capture) { ppu_use_2d(); ppu_br16 = fade_keep; ppu_br_base = fade_keep_base; }
 }
 
 void ppu_regs_keep(int y), ppu_regs_use(int y);
 void smooth_line_regs(int y) {
-  if (!emu_clone) { if (smooth_on) ppu_regs_keep(y); }
+  if (!emu_clone) { if (smooth_on) { ppu_regs_keep(y); if (y == 100) { fade_track(); fade_keep = ppu_br16; fade_keep_base = ppu_br_base; } } }
   else if (cl_capture) ppu_regs_use(y);
 }
 
@@ -262,6 +286,7 @@ void smooth_present(void) {
 }
 
 void smooth_reset(void) {
+  fade_n = 0; ppu_br16 = -1;
   for (int i = 0; i < 4; i++) snaps[i].valid = false;
   pend_ok = shown_ok = new_ok = swapped = smooth_snap_due = cur_interp = cur_fail = false;
   swap_frame = frame_no - 1000;

@@ -316,8 +316,10 @@ static inline u16 cmath(u16 a, u16 b, bool sub, bool half) {
   return r | g << 5 | bl << 10;
 }
 
+// Brightness in 1/16 steps, so smooth.c can ease a fade between the game's own steps.
+int ppu_br16 = -1, ppu_br_base;
 static inline u32 rgb_out(u16 color, int br) {
-  int r = (color & 31) * br / 15, g = ((color >> 5) & 31) * br / 15, b = ((color >> 10) & 31) * br / 15;
+  int r = (color & 31) * br / 240, g = ((color >> 5) & 31) * br / 240, b = ((color >> 10) & 31) * br / 240;
   return 0xff000000 | (r << 19 | (r >> 2) << 16) | (g << 11 | (g >> 2) << 8) | (b << 3 | b >> 2);
 }
 
@@ -366,7 +368,8 @@ void ppu_render_line(int line) {
   int clipm = (cgwsel >> 6) & 3, prevm = (cgwsel >> 4) & 3;
   int hn = hd_active_scale;
   u32 *hout = hn ? &hd_framebuf[(line - 1) * hn * 256 * hn] : NULL;
-  int br = ppu_inidisp & 15;
+  int br = (ppu_inidisp & 15) * 16;
+  if (ppu_br16 >= 0 && (ppu_inidisp & 15) == ppu_br_base) br = ppu_br16;
   for (int x = 0; x < 256; x++) {
     int mz = -1, ml = 5; u16 mc = back;
     int mz2 = -1; u16 mc2 = back;
