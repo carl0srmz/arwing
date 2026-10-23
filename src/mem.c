@@ -80,7 +80,7 @@ void pace_clone(bool on) {
   pace_off = on;
 }
 extern bool smooth_snap_due, ppu_skip;
-void smooth_wram_write(u32 a, u8 v); void smooth_snapshot(void); void smooth_bg12nba(u8 v); void smooth_line1(void);
+void smooth_wram_write(u32 a, u8 v); void smooth_snapshot(void); void smooth_bg12nba(u8 v); void smooth_line1(void); void smooth_line_regs(int y);
 static inline void wram_hook(u32 w, u8 v) {
   if (w == PACE_FRAMER && !pace_off) { pace_vbl = 0; pace_set(false); }
   if (w == 0x15a4 || w == 0x0000 || w == 0x18bb) smooth_wram_write(w, v);
@@ -123,6 +123,7 @@ static void tick(int c) {
     rendered = true;
     int last = ppu_overscan ? 239 : 224;
     if (vcount == 1) smooth_line1();
+    if (vcount >= 1 && vcount <= last) smooth_line_regs(vcount);
     if (vcount >= 1 && vcount <= last && !ppu_skip) ppu_render_line(vcount);
   }
   if (!hdma_done && hcount >= HDMA_HC) {

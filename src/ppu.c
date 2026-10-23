@@ -427,6 +427,47 @@ static Ppu2d p2d;
 void ppu_keep_2d(void) { memcpy(p2d.cgram, cgram, sizeof cgram); memcpy(p2d.oam, oam, sizeof oam); p2d.fixed_color = fixed_color; p2d.cgwsel = cgwsel; p2d.cgadsub = cgadsub; p2d.obsel = obsel; }
 void ppu_use_2d(void) { memcpy(cgram, p2d.cgram, sizeof cgram); memcpy(oam, p2d.oam, sizeof oam); fixed_color = p2d.fixed_color; cgwsel = p2d.cgwsel; cgadsub = p2d.cgadsub; obsel = p2d.obsel; }
 
+// Display registers the game's frozen logic would have set during the real frame (fades, windows,
+// layer enables, scroll). Recorded per line while the real frame is drawn, replayed on the copy's frame.
+typedef struct {
+  u8 inidisp, mosaic, bgmode, bgsc[4], wsel[3], wh[4], wbglog, wobjlog, tm, ts, tmw, tsw, cgwsel, cgadsub, setini, obsel;
+  u16 bghofs[4], bgvofs[4], fixed_color;
+} LineRegs;
+static LineRegs lregs[240];
+#define LR_BYTES(X) X(inidisp, ppu_inidisp) X(mosaic, mosaic) X(bgmode, bgmode) X(wbglog, wbglog) X(wobjlog, wobjlog) X(tm, tm) X(ts, ts) \
+  X(tmw, tmw) X(tsw, tsw) X(cgwsel, cgwsel) X(cgadsub, cgadsub) X(setini, setini) X(obsel, obsel)
+void ppu_regs_keep(int y) {
+  LineRegs *l = &lregs[y];
+#define K(f, v) l->f = v;
+  LR_BYTES(K)
+#undef K
+  memcpy(l->bgsc, bgsc, sizeof bgsc); memcpy(l->wsel, wsel, sizeof wsel); memcpy(l->wh, wh, sizeof wh);
+  memcpy(l->bghofs, bghofs, sizeof bghofs); memcpy(l->bgvofs, bgvofs, sizeof bgvofs); l->fixed_color = fixed_color;
+}
+int ppu_blend_num, ppu_blend_den = 1;
+static int lerp_n(int a, int b) { return a + (b - a) * ppu_blend_num / ppu_blend_den; }
+static u16 lerp_scroll(u16 a, u16 b) {
+  if ((a | b) > 0x3ff) return a;
+  int d = (b - a) & 0x3ff;
+  if (d > 512) d -= 1024;
+  return (u16)((a + d * ppu_blend_num / ppu_blend_den) & 0x3ff);
+}
+// The copy's own values are the next tick's; the flags and layer setup come from the real frame, and what the
+// game steps once per tick (brightness, scroll) is moved from the real frame's value to the copy's.
+void ppu_regs_use(int y) {
+  LineRegs *l = &lregs[y];
+  int br = l->inidisp & 15;
+  if (!((ppu_inidisp | l->inidisp) & 0x80)) br = lerp_n(br, ppu_inidisp & 15);
+  u16 hs[4], vs[4];
+  for (int i = 0; i < 4; i++) { hs[i] = lerp_scroll(l->bghofs[i], bghofs[i]); vs[i] = lerp_scroll(l->bgvofs[i], bgvofs[i]); }
+#define U(f, v) v = l->f;
+  LR_BYTES(U)
+#undef U
+  ppu_inidisp = (l->inidisp & 0xf0) | br;
+  memcpy(bgsc, l->bgsc, sizeof bgsc); memcpy(wsel, l->wsel, sizeof wsel); memcpy(wh, l->wh, sizeof wh); fixed_color = l->fixed_color;
+  memcpy(bghofs, hs, sizeof hs); memcpy(bgvofs, vs, sizeof vs);
+}
+
 void ppu_serialize(Ser *s) {
   SER(s, vram); SER(s, cgram); SER(s, oam); SER(s, ppu_inidisp); SER(s, ppu_overscan);
   SER(s, obsel); SER(s, bgmode); SER(s, mosaic); SER(s, bgsc); SER(s, bgnba); SER(s, vmain); SER(s, m7sel); SER(s, setini);

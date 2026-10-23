@@ -60,6 +60,12 @@ void smooth_line1(void) {
   else if (cl_capture) ppu_use_2d();
 }
 
+void ppu_regs_keep(int y), ppu_regs_use(int y);
+void smooth_line_regs(int y) {
+  if (!emu_clone) { if (smooth_on) ppu_regs_keep(y); }
+  else if (cl_capture) ppu_regs_use(y);
+}
+
 extern bool gsu_skip_run;
 
 void smooth_wram_write(u32 a, u8 v) {
@@ -176,7 +182,9 @@ extern u32 gsu_mul, gsu_base_mul;
 void apu_set_silent(bool on);
 void pace_clone(bool on);
 
+extern int ppu_blend_num, ppu_blend_den;
 static bool clone_frame(Snap *A, Snap *B, int num, int den) {
+  ppu_blend_num = num; ppu_blend_den = den;
   real.pos = 0; real.load = false;
   snes_serialize(&real);
   u16 tick = tick_now();
@@ -235,7 +243,17 @@ void smooth_present(void) {
   Snap *A = find(cur_tick), *B = find((u16)(cur_tick + 1));
   // If the copy never gets its image on screen (the game left its 3D loop), the last frame stays up and
   // real frames are drawn again until the next swap.
-  if (!A || !B || !clone_frame(A, B, cur_num, cur_den)) cur_fail = true;
+  static u32 keep[256 * 239], hd_keep[256 * 8 * 239 * 8];
+  size_t hn = hd_active_scale ? (size_t)256 * hd_active_scale * 239 * hd_active_scale : 0;
+  bool had = false;
+  for (int i = 0; i < 256 * 224 && !had; i++) had = framebuf[i] & 0xffffff;
+  if (hn <= sizeof hd_keep / 4) { memcpy(keep, framebuf, sizeof keep); if (hn) memcpy(hd_keep, hd_framebuf, hn * 4); }
+  bool ok = A && B && clone_frame(A, B, cur_num, cur_den);
+  // A copy that comes out completely black while the screen was not is a miss: keep the old image.
+  bool blank = ok && had;
+  for (int i = 0; i < 256 * 224 && blank; i++) blank = !(framebuf[i] & 0xffffff);
+  if (blank && hn <= sizeof hd_keep / 4) { memcpy(framebuf, keep, sizeof keep); if (hn) memcpy(hd_framebuf, hd_keep, hn * 4); }
+  if (!ok) cur_fail = true;
 }
 
 void smooth_reset(void) {
